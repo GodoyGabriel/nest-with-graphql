@@ -1,26 +1,49 @@
-import { Injectable } from '@nestjs/common';
-import { CreateItemInput } from './dto/create-item.input';
-import { UpdateItemInput } from './dto/update-item.input';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { Repository } from "typeorm";
+import { CreateItemInput } from "./dto/inputs/create-item.input";
+import { UpdateItemInput } from "./dto/inputs/update-item.input";
+import { Item } from "./entities/item.entity";
+import { InjectRepository } from "@nestjs/typeorm";
 
 @Injectable()
 export class ItemsService {
-  create(createItemInput: CreateItemInput) {
-    return 'This action adds a new item';
+  constructor(
+    @InjectRepository(Item)
+    private readonly ItemsRepository: Repository<Item>
+  ) {}
+
+  async create(createItemInput: CreateItemInput): Promise<Item> {
+    const newItem = this.ItemsRepository.create(createItemInput);
+    return await this.ItemsRepository.save(newItem);
   }
 
-  findAll() {
-    return [];
+  async findAll(): Promise<Item[]> {
+    return this.ItemsRepository.find();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} item`;
+  async findOne(id: string): Promise<Item> {
+    const item = await this.ItemsRepository.findOneBy({ id });
+
+    if (!item) throw new NotFoundException(`Item ${id} not found`);
+
+    return item;
   }
 
-  update(id: number, updateItemInput: UpdateItemInput) {
-    return `This action updates a #${id} item`;
+  async update(id: string, updateItemInput: UpdateItemInput): Promise<Item> {
+    // return this.ItemsRepository.update(id, updateItemInput);
+    const item = await this.ItemsRepository.preload(updateItemInput);
+
+    if (!item) throw new NotFoundException(`Item ${id} not found`);
+
+    return this.ItemsRepository.save(item);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} item`;
+  async remove(id: string): Promise<Item> {
+    // TODO: Soft delete
+    const item = await this.ItemsRepository.findOneBy({ id });
+
+    await this.ItemsRepository.delete(item);
+
+    return { ...item, id };
   }
 }
